@@ -24,6 +24,8 @@
 body {
   margin: 0;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--ink);
 }
@@ -156,7 +158,9 @@ h2 {
 }
 
 .calendar-area {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .filters {
@@ -189,6 +193,8 @@ h2 {
 
 .calendar {
   display: grid;
+  width: 100%;
+  max-width: 100%;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--line);
@@ -255,7 +261,9 @@ h2 {
 
 .weekday,
 .day-cell {
+  min-width: 0;
   background: var(--paper);
+  overflow: hidden;
 }
 
 .weekday {
@@ -534,7 +542,7 @@ dialog::backdrop {
 
 @media (max-width: 720px) {
   .app-shell {
-    padding: 16px;
+    padding: 12px;
   }
 
   .topbar {
