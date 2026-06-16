@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>営業結果レポート</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="homeView" class="view active-view" aria-label="ホーム">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Sales Report</p>
+            <h1>営業結果レポート</h1>
+            <p class="sync-status" id="syncStatus">保存先を確認中</p>
+          </div>
+          <div class="top-actions">
+            <button class="primary-button" id="openForm" type="button">報告入力</button>
+          </div>
+        </header>
+
+        <section class="calendar-area" aria-label="営業結果カレンダー">
+          <div class="calendar-toolbar">
+            <div class="month-tools" aria-label="月の切り替え">
+              <button class="icon-button" id="prevMonth" type="button" aria-label="前の月">‹</button>
+              <div class="month-label" id="currentMonth"></div>
+              <button class="icon-button" id="nextMonth" type="button" aria-label="次の月">›</button>
+            </div>
+            <div class="search-box" role="search">
+              <label for="searchInput">検索</label>
+              <div class="search-control">
+                <input id="searchInput" type="search" placeholder="会社名、担当者、所感、料金で検索" />
+                <button class="ghost-button" id="clearSearch" type="button">クリア</button>
+              </div>
+              <section class="search-results" id="searchResults" aria-label="検索結果" hidden>
+                <h2>検索結果</h2>
+                <ul id="searchResultList"></ul>
+              </section>
+            </div>
+            <div class="filters">
+              <button type="button" class="member-filter active" data-member="all">全体</button>
+              <button type="button" class="member-filter member-tanimoto" data-member="谷本">谷本</button>
+              <button type="button" class="member-filter member-aikawa" data-member="會川">會川</button>
+              <button type="button" class="member-filter member-uehara" data-member="上原">上原</button>
+              <button type="button" class="member-filter member-bay" data-member="ベイ">ベイ</button>
+            </div>
+          </div>
+
+          <div class="calendar" id="calendar" aria-live="polite"></div>
+          <p class="empty-message" id="emptyMessage" hidden>条件に一致する報告はありません。</p>
+        </section>
+      </section>
+
+      <section id="formView" class="view" aria-label="報告入力">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Report Form</p>
+            <h1 id="formTitle">報告入力</h1>
+          </div>
+          <button class="ghost-button" id="backHome" type="button">ホームへ戻る</button>
+        </header>
+
+        <section class="form-page">
+          <div class="panel-heading">
+            <h2>報告内容</h2>
+            <button id="resetDemo" type="button" class="text-button">初期データ</button>
+          </div>
+          <form id="reportForm">
+            <input type="hidden" id="editingId" />
+            <div class="form-grid">
+              <label>
+                <span>日付</span>
+                <input id="date" type="date" required />
+              </label>
+              <label>
+                <span>営業担当</span>
+                <select id="member" required>
+                  <option value="谷本">谷本</option>
+                  <option value="會川">會川</option>
+                  <option value="上原">上原</option>
+                  <option value="ベイ">ベイ</option>
+                </select>
+              </label>
+              <label>
+                <span>会社名</span>
+                <input id="company" type="text" required placeholder="例：株式会社サンプル" />
+              </label>
+              <label>
+                <span>担当者名</span>
+                <input id="contact" type="text" required placeholder="例：山田様" />
+              </label>
+            </div>
+
+            <fieldset class="fee-section">
+              <legend>料金内容</legend>
+              <div class="fee-grid" id="feeGrid"></div>
+            </fieldset>
+
+            <label>
+              <span>営業の所感</span>
+              <textarea id="note" rows="6" required placeholder="温度感、次回アクション、懸念点など"></textarea>
+            </label>
+            <div class="form-actions">
+              <button class="primary-button" type="submit" id="submitButton">保存</button>
+              <button class="ghost-button" type="button" id="clearForm">クリア</button>
+            </div>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="detailDialog">
+      <div class="dialog-head">
+        <h2 id="dialogTitle">報告詳細</h2>
+        <button class="icon-button" id="closeDialog" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div id="dialogBody" class="dialog-body"></div>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
