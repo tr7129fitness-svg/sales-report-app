@@ -189,8 +189,8 @@ h2 {
 
 .calendar {
   display: grid;
-  grid-template-columns: repeat(7, minmax(112px, 1fr));
-  overflow-x: auto;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--line);
@@ -259,7 +259,7 @@ h2 {
 }
 
 .weekday {
-  min-height: 42px;
+  min-height: 34px;
   display: grid;
   place-items: center;
   color: var(--muted);
@@ -268,8 +268,8 @@ h2 {
 }
 
 .day-cell {
-  min-height: 150px;
-  padding: 9px;
+  min-height: 118px;
+  padding: 7px;
 }
 
 .day-cell.outside {
@@ -281,8 +281,8 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 24px;
-  margin-bottom: 8px;
+  min-height: 22px;
+  margin-bottom: 5px;
 }
 
 .date-number {
@@ -290,22 +290,22 @@ h2 {
 }
 
 .report-count {
-  min-width: 24px;
-  height: 24px;
+  min-width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   background: #e7f1ee;
   color: var(--accent-dark);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
 }
 
 .report-card {
   width: 100%;
-  min-height: 54px;
-  margin-top: 7px;
-  padding: 8px;
+  min-height: 44px;
+  margin-top: 5px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-left: 5px solid var(--accent);
   border-radius: 8px;
@@ -322,13 +322,13 @@ h2 {
 }
 
 .report-card strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .report-card span {
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .report-card[data-member="谷本"] {
@@ -555,12 +555,44 @@ dialog::backdrop {
     flex-direction: column;
   }
 
-  .calendar {
-    grid-template-columns: repeat(7, minmax(104px, 1fr));
+  .day-cell {
+    min-height: 84px;
+    padding: 4px;
   }
 
-  .day-cell {
-    min-height: 132px;
+  .weekday {
+    min-height: 28px;
+    font-size: 11px;
+  }
+
+  .date-row {
+    min-height: 18px;
+    margin-bottom: 3px;
+  }
+
+  .date-number {
+    font-size: 12px;
+  }
+
+  .report-count {
+    min-width: 17px;
+    height: 17px;
+    font-size: 10px;
+  }
+
+  .report-card {
+    min-height: 28px;
+    margin-top: 3px;
+    padding: 3px 4px;
+    border-left-width: 3px;
+  }
+
+  .report-card strong {
+    font-size: 10px;
+  }
+
+  .report-card span {
+    display: none;
   }
 
   .form-page {
