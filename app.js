@@ -14,6 +14,9 @@ const feeItems = [
 ];
 const storageKey = "sales-report-app-v2";
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+const feeMinAmount = 10000;
+const feeMaxAmount = 40000;
+const feeStepAmount = 500;
 
 const state = {
   cursor: new Date(),
@@ -75,7 +78,7 @@ function formatYen(value) {
 
 function buildFeeOptions() {
   const options = ['<option value="none">なし</option>'];
-  for (let amount = 500; amount <= 20000; amount += 500) {
+  for (let amount = feeMinAmount; amount <= feeMaxAmount; amount += feeStepAmount) {
     options.push(`<option value="${amount}">${formatYen(amount)}円</option>`);
   }
   return options.join("");
