@@ -512,6 +512,7 @@ dialog::backdrop {
 
 .detail-row p {
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .detail-actions {
