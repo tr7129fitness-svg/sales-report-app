@@ -4,8 +4,10 @@ const members = ["谷本", "會川", "上原", "ベイ"];
 const feeItems = [
   "3h",
   "4h",
+  "5h",
   "3h(evening)",
   "9h",
+  "9h(上棟)",
   "夜勤3h",
   "夜勤4h",
   "夜勤9h",
