@@ -1,4 +1,9 @@
-import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
+import {
+  firebaseConfig,
+  hasFirebaseConfig,
+  hasWebPushConfig,
+  webPushPublicKey,
+} from "./firebase-config.js";
 
 const members = ["谷本", "會川", "上原", "ベイ"];
 const feeItems = [
@@ -27,12 +32,18 @@ const state = {
   reports: [],
   unsubscribe: null,
   storeMode: "local",
+  db: null,
+  firestore: null,
+  collectionRef: null,
+  pushCollectionRef: null,
 };
 
 const el = {
   homeView: document.querySelector("#homeView"),
   formView: document.querySelector("#formView"),
   openForm: document.querySelector("#openForm"),
+  enableNotifications: document.querySelector("#enableNotifications"),
+  notificationStatus: document.querySelector("#notificationStatus"),
   backHome: document.querySelector("#backHome"),
   formTitle: document.querySelector("#formTitle"),
   syncStatus: document.querySelector("#syncStatus"),
@@ -129,11 +140,18 @@ async function connectFirestore() {
   const app = firebase.initializeApp(firebaseConfig);
   const db = firestore.getFirestore(app);
   const collectionRef = firestore.collection(db, "reports");
+  const pushCollectionRef = firestore.collection(db, "pushSubscriptions");
 
   state.storeMode = "firebase";
+  state.db = db;
   state.firestore = firestore;
   state.collectionRef = collectionRef;
+  state.pushCollectionRef = pushCollectionRef;
   el.syncStatus.textContent = "保存先: Firebase共有保存";
+  setupPushControls().catch((error) => {
+    console.error("Push setup failed.", error);
+    setNotificationStatus("通知: 初期化に失敗しました", true);
+  });
 
   state.unsubscribe = firestore.onSnapshot(
     firestore.query(collectionRef, firestore.orderBy("date", "asc")),
@@ -146,6 +164,129 @@ async function connectFirestore() {
       el.syncStatus.textContent = "保存先: Firebase共有保存（読み込みエラー）";
     },
   );
+}
+
+function isPushSupported() {
+  return (
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window &&
+    window.isSecureContext
+  );
+}
+
+function setNotificationStatus(message, isError = false) {
+  if (!el.notificationStatus) return;
+  el.notificationStatus.hidden = !message;
+  el.notificationStatus.textContent = message || "";
+  el.notificationStatus.classList.toggle("error", isError);
+}
+
+async function setupPushControls() {
+  if (!el.enableNotifications) return;
+
+  if (!isPushSupported()) {
+    el.enableNotifications.hidden = true;
+    setNotificationStatus("通知: この環境では未対応です", true);
+    return;
+  }
+
+  if (!hasWebPushConfig()) {
+    el.enableNotifications.hidden = true;
+    setNotificationStatus("通知: Web Pushキー未設定", true);
+    return;
+  }
+
+  const registration = await navigator.serviceWorker.register("./service-worker.js");
+  const subscription = await registration.pushManager.getSubscription();
+
+  if (Notification.permission === "granted" && subscription) {
+    await savePushSubscription(subscription);
+    el.enableNotifications.hidden = true;
+    setNotificationStatus("通知: 許可済み");
+    return;
+  }
+
+  if (Notification.permission === "denied") {
+    el.enableNotifications.hidden = true;
+    setNotificationStatus("通知: iPhone側でブロックされています", true);
+    return;
+  }
+
+  el.enableNotifications.hidden = false;
+  setNotificationStatus("通知: 未設定");
+}
+
+async function enablePushNotifications() {
+  if (!state.firestore || !state.pushCollectionRef) {
+    setNotificationStatus("通知: Firebase接続後にもう一度試してください", true);
+    return;
+  }
+
+  try {
+    el.enableNotifications.disabled = true;
+    setNotificationStatus("通知: 許可を確認中");
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      setNotificationStatus("通知: 許可されませんでした", true);
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.register("./service-worker.js");
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(webPushPublicKey),
+    });
+
+    await savePushSubscription(subscription);
+    el.enableNotifications.hidden = true;
+    setNotificationStatus("通知: 許可済み");
+  } catch (error) {
+    console.error("Push subscription failed.", error);
+    setNotificationStatus("通知: 登録に失敗しました", true);
+  } finally {
+    el.enableNotifications.disabled = false;
+  }
+}
+
+async function savePushSubscription(subscription) {
+  const { doc, serverTimestamp, setDoc } = state.firestore;
+  const payload = subscription.toJSON();
+  const subscriptionId = await sha256Base64Url(payload.endpoint);
+
+  await setDoc(
+    doc(state.pushCollectionRef, subscriptionId),
+    {
+      subscription: payload,
+      endpoint: payload.endpoint,
+      userAgent: navigator.userAgent,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+async function sha256Base64Url(value) {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
+function base64UrlEncode(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function createDemoReports() {
@@ -464,6 +605,7 @@ function bindEvents() {
     clearForm();
     showView("form");
   });
+  el.enableNotifications?.addEventListener("click", enablePushNotifications);
   el.backHome.addEventListener("click", () => showView("home"));
   el.form.addEventListener("submit", saveReport);
   el.clearForm.addEventListener("click", clearForm);

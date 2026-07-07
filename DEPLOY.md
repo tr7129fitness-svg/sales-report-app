@@ -1,35 +1,63 @@
-# 無料公開手順
+# デプロイ手順
 
-このWebアプリはHTML/CSS/JavaScriptだけで動くため、GitHub Pagesで無料公開できます。Firebase設定を入れると、Firestoreに共有保存されます。
+このWebアプリはGitHub Pagesで公開し、共有保存にはFirebase Firestoreを使います。
 
-## Firebase共有保存を設定する
+## Webアプリ
 
-1. Firebase Consoleで無料のSpark planのプロジェクトを作成する
-2. Webアプリを追加して、Firebase configuration objectを取得する
-3. Firestore Databaseを作成する
-4. `firestore.rules` の内容をFirestore Rulesに反映する
-5. `firebase-config.js` の空欄をFirebase configuration objectの値で埋める
+`sales-report-app-publish` はGitHub Pagesで公開する静的ファイルです。
 
-Firestoreの無料枠は、Standard editionで保存1GiB、1日あたり読み取り50K、書き込み20K、削除20Kまで無料枠があります。小規模な営業報告アプリなら、通常は無料枠内で運用できます。
+```sh
+cd sales-report-app-publish
+git status
+git add .
+git commit -m "Add web push notification support"
+git push
+```
 
-注意: `firestore.rules` はログインなしで読み書きできる公開ルールです。URLを知っている人なら編集できるため、社外にURLを広げない運用にしてください。より安全にする場合は、Googleログインや匿名認証を追加します。
+## Firebase共有保存
 
-## GitHub Pagesで公開する
+Firestoreのルールは `sales-report-app-publish/firestore.rules` にあります。
 
-1. GitHubで新しいpublic repositoryを作成する
-2. `outputs` フォルダ内のファイルをリポジトリ直下へアップロードする
-   - `index.html`
-   - `styles.css`
-   - `app.js`
-   - `firebase-config.js`
-   - `.nojekyll`
-3. GitHubのリポジトリで `Settings` → `Pages` を開く
-4. `Build and deployment` のSourceを `Deploy from a branch` にする
-5. Branchを `main`、Folderを `/root` にして保存する
-6. 数分後に `https://ユーザー名.github.io/リポジトリ名/` で公開される
+```sh
+firebase deploy --only firestore:rules
+```
 
-## 無料運用の注意
+現在のルールはログインなしで読み書きできる公開ルールです。URLを知っている人なら編集できるため、社外にURLを広げない運用にしてください。
 
-- 無料で使うにはpublic repositoryにする
-- このアプリはデータベースを使わないため、入力データは利用者ごとのブラウザ内に保存される
-- 社員全員で同じデータを共有したい場合は、後でGoogle Sheets連携などを追加する
+## プッシュ通知
+
+Web Pushを使う場合はFirebase Blazeプランが必要です。通常の営業報告件数なら無料枠内に収まる見込みですが、Google Cloud側で予算アラートを設定してください。
+
+### 1. VAPIDキーを生成
+
+```sh
+npx web-push generate-vapid-keys
+```
+
+出力された公開鍵を `sales-report-app-publish/firebase-config.js` の `webPushPublicKey` に設定します。秘密鍵はリポジトリに入れません。
+
+### 2. Functions設定を用意
+
+`functions/.env.example` を参考に、`functions/.env` を作成します。
+
+```sh
+WEB_PUSH_PUBLIC_KEY=生成した公開鍵
+WEB_PUSH_CONTACT_EMAIL=tr7129@icloud.com
+APP_URL=https://tr7129fitness-svg.github.io/sales-report-app/
+```
+
+秘密鍵はSecretとして登録します。
+
+```sh
+firebase functions:secrets:set WEB_PUSH_PRIVATE_KEY
+```
+
+### 3. Functionsをデプロイ
+
+```sh
+firebase deploy --only functions,firestore:rules
+```
+
+### 4. iPhoneで有効化
+
+Safariで公開URLを開き、共有メニューからホーム画面に追加します。追加したホーム画面アプリを開いて、`通知を許可` を押します。

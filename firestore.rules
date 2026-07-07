@@ -5,5 +5,10 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow read, create, update, delete: if true;
     }
+
+    match /pushSubscriptions/{subscriptionId} {
+      allow create, update, delete: if true;
+      allow read: if false;
+    }
   }
 }

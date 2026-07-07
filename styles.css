@@ -105,6 +105,17 @@ h2 {
   font-weight: 800;
 }
 
+.notification-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notification-status.error {
+  color: var(--danger);
+}
+
 .calendar-toolbar {
   justify-content: space-between;
   gap: 14px;
@@ -553,6 +564,7 @@ dialog::backdrop {
 
   .top-actions,
   .top-actions .primary-button,
+  .top-actions .ghost-button,
   #backHome,
   .search-control,
   .search-control .ghost-button {

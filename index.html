@@ -4,7 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>営業結果レポート</title>
-    <link rel="stylesheet" href="./styles.css?v=20260624-1" />
+    <meta name="theme-color" content="#176f63" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="営業報告" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./app-icon.svg" />
+    <link rel="stylesheet" href="./styles.css?v=20260707-push1" />
   </head>
   <body>
     <main class="app-shell">
@@ -16,8 +23,10 @@
             <p class="sync-status" id="syncStatus">保存先を確認中</p>
           </div>
           <div class="top-actions">
+            <button class="ghost-button" id="enableNotifications" type="button" hidden>通知を許可</button>
             <button class="primary-button" id="openForm" type="button">報告入力</button>
           </div>
+          <p class="notification-status" id="notificationStatus" hidden></p>
         </header>
 
         <section class="calendar-area" aria-label="営業結果カレンダー">
@@ -118,6 +127,6 @@
       <div id="dialogBody" class="dialog-body"></div>
     </dialog>
 
-    <script type="module" src="./app.js?v=20260624-1"></script>
+    <script type="module" src="./app.js?v=20260707-push1"></script>
   </body>
 </html>

@@ -7,6 +7,13 @@ export const firebaseConfig = {
   appId: "1:164547707960:web:59c733082ccdcff41292cd",
 };
 
+export const webPushPublicKey =
+  "BEVYci_ey1kU6y7D1UvG0wxXsQ5A7xsbbEjDCERy044ywaqjActpcoWbjFDnO8DJkfd8CKqiUIFjmzebfUJ-Kpo";
+
 export function hasFirebaseConfig() {
   return Object.values(firebaseConfig).every((value) => String(value).trim().length > 0);
+}
+
+export function hasWebPushConfig() {
+  return webPushPublicKey.trim().length > 0;
 }

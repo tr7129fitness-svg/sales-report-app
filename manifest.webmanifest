@@ -1,0 +1,19 @@
+{
+  "id": "/sales-report-app/",
+  "name": "営業結果レポート",
+  "short_name": "営業報告",
+  "description": "営業報告を共有して確認するためのアプリです。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f4",
+  "theme_color": "#176f63",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
