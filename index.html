@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./app-icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260707-push1" />
+    <link rel="stylesheet" href="./styles.css?v=20260909-price-list1" />
   </head>
   <body>
     <main class="app-shell">
@@ -106,6 +106,22 @@
               <div class="fee-grid" id="feeGrid"></div>
             </fieldset>
 
+            <section class="price-list-section" aria-labelledby="priceListHeading">
+              <div class="price-list-head">
+                <div>
+                  <p class="eyebrow">PDF</p>
+                  <h2 id="priceListHeading">料金表</h2>
+                </div>
+                <span>PDF・15MBまで</span>
+              </div>
+              <p class="price-list-current" id="priceListCurrent">料金表は未登録です。</p>
+              <div class="price-list-controls">
+                <input id="priceListFile" type="file" accept="application/pdf,.pdf" />
+                <button class="ghost-button" id="uploadPriceList" type="button">Google Driveへ保存</button>
+              </div>
+              <p class="price-list-status" id="priceListStatus" aria-live="polite"></p>
+            </section>
+
             <label>
               <span>営業の所感</span>
               <textarea id="note" rows="6" required placeholder="温度感、次回アクション、懸念点など"></textarea>
@@ -127,6 +143,6 @@
       <div id="dialogBody" class="dialog-body"></div>
     </dialog>
 
-    <script type="module" src="./app.js?v=20260707-push1"></script>
+    <script type="module" src="./app.js?v=20260909-price-list1"></script>
   </body>
 </html>
