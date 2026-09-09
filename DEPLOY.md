@@ -24,6 +24,11 @@ firebase deploy --only firestore:rules
 
 現在のルールはログインなしで読み書きできる公開ルールです。URLを知っている人なら編集できるため、社外にURLを広げない運用にしてください。
 
+## 料金表PDF
+
+料金表PDFのGoogle Drive保存には、`google-drive-uploader/README.md` の手順でApps Script Webアプリを作成します。
+発行された`/exec` URLとアップロードキーを `firebase-config.js` の `driveUploadSettings` へ設定してから、WebアプリをGitHub Pagesに公開してください。
+
 ## プッシュ通知
 
 Web Pushを使う場合はFirebase Blazeプランが必要です。通常の営業報告件数なら無料枠内に収まる見込みですが、Google Cloud側で予算アラートを設定してください。
