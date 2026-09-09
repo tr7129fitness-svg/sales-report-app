@@ -10,6 +10,13 @@ export const firebaseConfig = {
 export const webPushPublicKey =
   "BEVYci_ey1kU6y7D1UvG0wxXsQ5A7xsbbEjDCERy044ywaqjActpcoWbjFDnO8DJkfd8CKqiUIFjmzebfUJ-Kpo";
 
+export const driveUploadSettings = {
+  // Apps ScriptをWebアプリとして公開した後に、末尾が /exec のURLを貼り付けます。
+  endpoint: "",
+  // Apps ScriptのPRICE_LIST_UPLOAD_KEYと同じ文字列を貼り付けます。
+  uploadKey: "",
+};
+
 export function hasFirebaseConfig() {
   return Object.values(firebaseConfig).every((value) => String(value).trim().length > 0);
 }
