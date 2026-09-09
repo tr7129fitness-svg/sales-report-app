@@ -15,7 +15,16 @@ Firebase Firestoreに共有保存されるため、同じ公開URLを見る社�
 - 会社名
 - 担当者名
 - 料金内容：各項目ごとに `なし` または500円単位で選択
+- 料金表：PDFをGoogle Driveへ保存し、そのリンクを営業報告ごとに記録
 - 営業の所感
+
+## 料金表PDF
+
+営業報告の入力画面にある「料金表」からPDFを選択してGoogle Driveへ保存できます。
+保存先は `営業報告アプリ_料金表` フォルダで、保存完了後に報告を保存すると、詳細画面の料金表欄から開けます。
+
+初回のみ、`google-drive-uploader/README.md` に従ってApps ScriptのWebアプリを設定し、
+`firebase-config.js` の `driveUploadSettings` にデプロイURLとアップロードキーを設定します。
 
 ## 検索
 
