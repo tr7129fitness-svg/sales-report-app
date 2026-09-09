@@ -430,6 +430,54 @@ textarea:focus {
   padding: 16px;
 }
 
+.price-list-section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 16px;
+}
+
+.price-list-head,
+.price-list-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.price-list-head {
+  justify-content: space-between;
+}
+
+.price-list-head .eyebrow {
+  margin-bottom: 3px;
+}
+
+.price-list-head > span,
+.price-list-current,
+.price-list-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.price-list-current a,
+.detail-link {
+  color: var(--accent);
+}
+
+.price-list-status.error {
+  color: var(--danger);
+}
+
+.price-list-controls input {
+  min-width: 0;
+  flex: 1;
+}
+
 .fee-section legend {
   padding: 0 8px;
   color: var(--ink);
@@ -624,5 +672,15 @@ dialog::backdrop {
   .fee-grid,
   .detail-row {
     grid-template-columns: 1fr;
+  }
+
+  .price-list-head,
+  .price-list-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .price-list-controls .ghost-button {
+    width: 100%;
   }
 }
