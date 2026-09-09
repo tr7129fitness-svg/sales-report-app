@@ -3,6 +3,7 @@ import {
   hasFirebaseConfig,
   hasWebPushConfig,
   webPushPublicKey,
+  driveUploadSettings,
 } from "./firebase-config.js";
 
 const members = ["谷本", "會川", "上原", "ベイ"];
@@ -24,6 +25,7 @@ const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const feeMinAmount = 10000;
 const feeMaxAmount = 40000;
 const feeStepAmount = 500;
+const priceListMaxBytes = 15 * 1024 * 1024;
 
 const state = {
   cursor: new Date(),
@@ -36,6 +38,8 @@ const state = {
   firestore: null,
   collectionRef: null,
   pushCollectionRef: null,
+  pendingPriceList: null,
+  priceListUploading: false,
 };
 
 const el = {
@@ -61,6 +65,10 @@ const el = {
   company: document.querySelector("#company"),
   contact: document.querySelector("#contact"),
   feeGrid: document.querySelector("#feeGrid"),
+  priceListFile: document.querySelector("#priceListFile"),
+  uploadPriceList: document.querySelector("#uploadPriceList"),
+  priceListCurrent: document.querySelector("#priceListCurrent"),
+  priceListStatus: document.querySelector("#priceListStatus"),
   note: document.querySelector("#note"),
   submitButton: document.querySelector("#submitButton"),
   clearForm: document.querySelector("#clearForm"),
@@ -108,6 +116,173 @@ function renderFeeInputs() {
       `,
     )
     .join("");
+}
+
+function normalizePriceList(value) {
+  if (!value || typeof value.url !== "string" || !value.url) return null;
+  return {
+    id: String(value.id || value.url),
+    name: String(value.name || "料金表.pdf"),
+    url: value.url,
+    uploadedAt: String(value.uploadedAt || ""),
+  };
+}
+
+function setPriceListStatus(message = "", isError = false) {
+  el.priceListStatus.textContent = message;
+  el.priceListStatus.classList.toggle("error", isError);
+}
+
+function renderPriceListSelection() {
+  const priceList = normalizePriceList(state.pendingPriceList);
+  el.priceListCurrent.innerHTML = "";
+
+  if (!priceList) {
+    el.priceListCurrent.textContent = "料金表は未登録です。";
+    return;
+  }
+
+  const label = document.createElement("span");
+  label.textContent = "登録済み: ";
+  const link = document.createElement("a");
+  link.href = priceList.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = priceList.name;
+  el.priceListCurrent.append(label, link);
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("PDFを読み込めませんでした。"));
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.readAsDataURL(file);
+  });
+}
+
+function makeUploadId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `price-list-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function submitDriveUpload(payload) {
+  const endpoint = driveUploadSettings.endpoint.trim();
+  const frameName = `price-list-upload-${payload.uploadId}`;
+  const frame = document.createElement("iframe");
+  frame.name = frameName;
+  frame.hidden = true;
+
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = endpoint;
+  form.target = frameName;
+  form.hidden = true;
+
+  Object.entries(payload).forEach(([key, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = key;
+    input.value = value;
+    form.append(input);
+  });
+
+  document.body.append(frame, form);
+  form.submit();
+  window.setTimeout(() => {
+    frame.remove();
+    form.remove();
+  }, 120000);
+}
+
+function getUploadStatus(uploadId) {
+  return new Promise((resolve, reject) => {
+    const endpoint = new URL(driveUploadSettings.endpoint.trim());
+    const callbackName = `priceListStatus_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const script = document.createElement("script");
+    const finish = (error, result) => {
+      window.clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const timeout = window.setTimeout(() => finish(new Error("Google Driveからの応答がありません。")), 10000);
+
+    window[callbackName] = (result) => finish(null, result);
+    script.onerror = () => finish(new Error("Google Driveの確認に失敗しました。"));
+    endpoint.searchParams.set("action", "getUploadStatus");
+    endpoint.searchParams.set("upload_id", uploadId);
+    endpoint.searchParams.set("callback", callbackName);
+    script.src = endpoint.toString();
+    document.head.append(script);
+  });
+}
+
+async function waitForDriveUpload(uploadId) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const response = await getUploadStatus(uploadId);
+    if (response?.ok && response.data?.status === "complete") return response.data;
+    if (response?.ok && response.data?.status === "failed") {
+      throw new Error(response.data.message || "Google Driveへの保存に失敗しました。");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+  }
+  throw new Error("Google Driveへの保存が時間切れになりました。");
+}
+
+async function uploadPriceList() {
+  if (state.priceListUploading) return;
+  const [file] = el.priceListFile.files;
+  const endpoint = driveUploadSettings.endpoint.trim();
+
+  if (!file) {
+    setPriceListStatus("登録するPDFを選択してください。", true);
+    return;
+  }
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    setPriceListStatus("PDFファイルだけを登録できます。", true);
+    return;
+  }
+  if (file.size > priceListMaxBytes) {
+    setPriceListStatus("PDFは15MB以下にしてください。", true);
+    return;
+  }
+  if (!endpoint) {
+    setPriceListStatus("Google Drive連携の設定がまだ完了していません。", true);
+    return;
+  }
+
+  state.priceListUploading = true;
+  el.uploadPriceList.disabled = true;
+  setPriceListStatus("Google Driveへ保存しています…");
+
+  try {
+    const uploadId = makeUploadId();
+    submitDriveUpload({
+      action: "uploadPriceList",
+      upload_id: uploadId,
+      upload_key: driveUploadSettings.uploadKey.trim(),
+      file_name: file.name,
+      mime_type: file.type || "application/pdf",
+      file_data: await readFileAsBase64(file),
+    });
+    const saved = await waitForDriveUpload(uploadId);
+    state.pendingPriceList = {
+      id: saved.fileId,
+      name: saved.fileName || file.name,
+      url: saved.url,
+      uploadedAt: saved.uploadedAt || new Date().toISOString(),
+    };
+    el.priceListFile.value = "";
+    renderPriceListSelection();
+    setPriceListStatus("Google Driveへ保存しました。報告を保存すると料金表リンクも登録されます。");
+  } catch (error) {
+    setPriceListStatus(error.message || "料金表の登録に失敗しました。", true);
+  } finally {
+    state.priceListUploading = false;
+    el.uploadPriceList.disabled = false;
+  }
 }
 
 async function loadReports() {
@@ -357,6 +532,7 @@ function searchableText(report) {
       report.contact,
       report.note,
       feeSummary(report.fees),
+      report.priceList?.name || "",
     ].join(" "),
   );
 }
@@ -467,12 +643,17 @@ function openDetail(id) {
   if (!report) return;
 
   el.dialogTitle.textContent = `${report.company} / ${report.member}`;
+  const priceList = normalizePriceList(report.priceList);
+  const priceListRow = priceList
+    ? `<div class="detail-row"><span>料金表</span><strong><a class="detail-link" href="${escapeHtml(priceList.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(priceList.name)}</a></strong></div>`
+    : `<div class="detail-row"><span>料金表</span><strong>未登録</strong></div>`;
   el.dialogBody.innerHTML = `
     <div class="detail-row"><span>日付</span><strong>${escapeHtml(report.date)}</strong></div>
     <div class="detail-row"><span>営業担当</span><strong>${escapeHtml(report.member)}</strong></div>
     <div class="detail-row"><span>会社名</span><strong>${escapeHtml(report.company)}</strong></div>
     <div class="detail-row"><span>担当者名</span><strong>${escapeHtml(report.contact)}</strong></div>
     <div class="detail-row"><span>料金内容</span><strong>${escapeHtml(feeSummary(report.fees))}</strong></div>
+    ${priceListRow}
     <div class="detail-row"><span>営業の所感</span><p>${escapeHtml(report.note)}</p></div>
     <div class="detail-actions">
       <button class="ghost-button" type="button" data-action="edit">編集</button>
@@ -515,6 +696,10 @@ function fillForm(report) {
   el.company.value = report.company;
   el.contact.value = report.contact;
   setFees(report.fees);
+  state.pendingPriceList = normalizePriceList(report.priceList);
+  el.priceListFile.value = "";
+  renderPriceListSelection();
+  setPriceListStatus("");
   el.note.value = report.note;
   el.formTitle.textContent = "報告編集";
   el.submitButton.textContent = "更新";
@@ -526,6 +711,10 @@ function clearForm() {
   el.date.value = toDateKey(new Date());
   el.editingId.value = "";
   setFees();
+  state.pendingPriceList = null;
+  el.priceListFile.value = "";
+  renderPriceListSelection();
+  setPriceListStatus("");
   el.formTitle.textContent = "報告入力";
   el.submitButton.textContent = "保存";
 }
@@ -555,6 +744,7 @@ async function saveReport(event) {
     company: el.company.value.trim(),
     contact: el.contact.value.trim(),
     fees: collectFees(),
+    priceList: normalizePriceList(state.pendingPriceList),
     note: el.note.value.trim(),
   };
 
@@ -606,6 +796,7 @@ function bindEvents() {
     showView("form");
   });
   el.enableNotifications?.addEventListener("click", enablePushNotifications);
+  el.uploadPriceList.addEventListener("click", uploadPriceList);
   el.backHome.addEventListener("click", () => showView("home"));
   el.form.addEventListener("submit", saveReport);
   el.clearForm.addEventListener("click", clearForm);
