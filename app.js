@@ -330,9 +330,8 @@ async function connectFirestore() {
     renderCalendar();
     clearForm();
     el.dialog.close();
-    document.querySelector("#attachmentView").hidden = true;
-    document.querySelector("#attachmentContent").replaceChildren();
     if (!approved) return;
+    if (redirectLinkedAttachment()) return;
   el.syncStatus.textContent = "保存先: Firebase共有保存";
   setupPushControls().catch((error) => {
     console.error("Push setup failed.", error);
@@ -351,41 +350,19 @@ async function connectFirestore() {
       el.syncStatus.textContent = "保存先: Firebase共有保存（読み込みエラー）";
     },
   );
-    openLinkedAttachment(version, () => accessVersion).catch((error) => {
-      if (version !== accessVersion) return;
-      document.querySelector("#attachmentContent").textContent = error.message;
-    });
   });
 }
 
 function priceListLink(item) {
   if (!/^[a-zA-Z0-9_-]{10,}$/.test(item.id)) return item.url;
-  const url = new URL(location.pathname, location.origin);
-  url.searchParams.set("attachment", item.id);
-  return url.href;
+  return `https://drive.google.com/file/d/${item.id}/view`;
 }
 
-async function openLinkedAttachment(version, currentVersion) {
+function redirectLinkedAttachment() {
   const id = new URLSearchParams(location.search).get("attachment");
-  if (!id) return;
-  const viewer = document.querySelector("#attachmentView");
-  const content = document.querySelector("#attachmentContent");
-  viewer.hidden = false;
-  content.textContent = "料金表を読み込んでいます…";
-  const file = await driveRequest({ action: "readPriceList", file_id: id });
-  if (version !== currentVersion()) return;
-  const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
-  const url = URL.createObjectURL(new Blob([bytes], { type: file.mimeType }));
-  content.replaceChildren();
-  const link = document.createElement("a");
-  link.href = url; link.download = file.fileName; link.textContent = file.fileName + " をダウンロード";
-  content.append(link);
-  const preview = document.createElement(file.mimeType === "application/pdf" ? "iframe" : "img");
-  preview.src = url;
-  preview.title = file.fileName;
-  preview.className = "attachment-preview";
-  content.append(preview);
-  window.addEventListener("pagehide", () => URL.revokeObjectURL(url), { once: true });
+  if (!id || !/^[a-zA-Z0-9_-]{10,}$/.test(id)) return false;
+  location.replace(priceListLink({ id }));
+  return true;
 }
 
 function isPushSupported() {
