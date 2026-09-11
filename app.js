@@ -5,6 +5,7 @@ import {
   webPushPublicKey,
   driveUploadSettings,
 } from "./firebase-config.js";
+import { initializeAccess, requireApprovedUser, driveRequest } from "./access.js";
 
 const members = ["谷本", "會川", "上原", "ベイ"];
 const feeItems = [
@@ -26,6 +27,7 @@ const feeMinAmount = 10000;
 const feeMaxAmount = 40000;
 const feeStepAmount = 500;
 const priceListMaxBytes = 15 * 1024 * 1024;
+const priceListMaxFiles = 8;
 
 const state = {
   cursor: new Date(),
@@ -38,7 +40,10 @@ const state = {
   firestore: null,
   collectionRef: null,
   pushCollectionRef: null,
-  pendingPriceList: null,
+  auth: null,
+  authSdk: null,
+  authUser: null,
+  pendingPriceLists: [],
   priceListUploading: false,
 };
 
@@ -48,6 +53,8 @@ const el = {
   openForm: document.querySelector("#openForm"),
   enableNotifications: document.querySelector("#enableNotifications"),
   notificationStatus: document.querySelector("#notificationStatus"),
+  authStatus: document.querySelector("#authStatus"),
+  authButton: document.querySelector("#authButton"),
   backHome: document.querySelector("#backHome"),
   formTitle: document.querySelector("#formTitle"),
   syncStatus: document.querySelector("#syncStatus"),
@@ -65,7 +72,7 @@ const el = {
   company: document.querySelector("#company"),
   contact: document.querySelector("#contact"),
   feeGrid: document.querySelector("#feeGrid"),
-  priceListFile: document.querySelector("#priceListFile"),
+  priceListFiles: document.querySelector("#priceListFiles"),
   uploadPriceList: document.querySelector("#uploadPriceList"),
   priceListCurrent: document.querySelector("#priceListCurrent"),
   priceListStatus: document.querySelector("#priceListStatus"),
@@ -120,12 +127,30 @@ function renderFeeInputs() {
 
 function normalizePriceList(value) {
   if (!value || typeof value.url !== "string" || !value.url) return null;
+  let url;
+  try {
+    url = new URL(value.url);
+    if (url.protocol !== "https:" && url.origin !== location.origin) return null;
+  } catch (_) { return null; }
   return {
     id: String(value.id || value.url),
-    name: String(value.name || "料金表.pdf"),
+    name: String(value.name || "料金表ファイル"),
     url: value.url,
+    mimeType: String(value.mimeType || ""),
     uploadedAt: String(value.uploadedAt || ""),
   };
+}
+
+function normalizePriceLists(value, legacyValue) {
+  const values = Array.isArray(value) ? value : [];
+  const normalized = values.map(normalizePriceList).filter(Boolean);
+  if (normalized.length > 0) return normalized;
+  const legacy = normalizePriceList(legacyValue);
+  return legacy ? [legacy] : [];
+}
+
+function isImagePriceList(item) {
+  return item.mimeType.startsWith("image/") || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(item.name);
 }
 
 function setPriceListStatus(message = "", isError = false) {
@@ -133,29 +158,45 @@ function setPriceListStatus(message = "", isError = false) {
   el.priceListStatus.classList.toggle("error", isError);
 }
 
+
 function renderPriceListSelection() {
-  const priceList = normalizePriceList(state.pendingPriceList);
+  const priceLists = normalizePriceLists(state.pendingPriceLists);
   el.priceListCurrent.innerHTML = "";
 
-  if (!priceList) {
+  if (priceLists.length === 0) {
     el.priceListCurrent.textContent = "料金表は未登録です。";
     return;
   }
 
-  const label = document.createElement("span");
-  label.textContent = "登録済み: ";
-  const link = document.createElement("a");
-  link.href = priceList.url;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  link.textContent = priceList.name;
-  el.priceListCurrent.append(label, link);
+  const list = document.createElement("div");
+  list.className = "price-list-items";
+  priceLists.forEach((priceList, index) => {
+    const item = document.createElement("div");
+    item.className = "price-list-item";
+    const link = document.createElement("a");
+    link.href = priceListLink(priceList);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = priceList.name;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "price-list-remove";
+    remove.textContent = "外す";
+    remove.addEventListener("click", () => {
+      state.pendingPriceLists.splice(index, 1);
+      renderPriceListSelection();
+      setPriceListStatus("料金表から外しました。Google Drive上の元ファイルは残ります。");
+    });
+    item.append(link, remove);
+    list.append(item);
+  });
+  el.priceListCurrent.append(list);
 }
 
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("PDFを読み込めませんでした。"));
+    reader.onerror = () => reject(new Error("ファイルを読み込めませんでした。"));
     reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
     reader.readAsDataURL(file);
   });
@@ -166,86 +207,28 @@ function makeUploadId() {
   return `price-list-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function submitDriveUpload(payload) {
-  const endpoint = driveUploadSettings.endpoint.trim();
-  const frameName = `price-list-upload-${payload.uploadId}`;
-  const frame = document.createElement("iframe");
-  frame.name = frameName;
-  frame.hidden = true;
-
-  const form = document.createElement("form");
-  form.method = "post";
-  form.action = endpoint;
-  form.target = frameName;
-  form.hidden = true;
-
-  Object.entries(payload).forEach(([key, value]) => {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = key;
-    input.value = value;
-    form.append(input);
-  });
-
-  document.body.append(frame, form);
-  form.submit();
-  window.setTimeout(() => {
-    frame.remove();
-    form.remove();
-  }, 120000);
-}
-
-function getUploadStatus(uploadId) {
-  return new Promise((resolve, reject) => {
-    const endpoint = new URL(driveUploadSettings.endpoint.trim());
-    const callbackName = `priceListStatus_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const script = document.createElement("script");
-    const finish = (error, result) => {
-      window.clearTimeout(timeout);
-      delete window[callbackName];
-      script.remove();
-      if (error) reject(error);
-      else resolve(result);
-    };
-    const timeout = window.setTimeout(() => finish(new Error("Google Driveからの応答がありません。")), 10000);
-
-    window[callbackName] = (result) => finish(null, result);
-    script.onerror = () => finish(new Error("Google Driveの確認に失敗しました。"));
-    endpoint.searchParams.set("action", "getUploadStatus");
-    endpoint.searchParams.set("upload_id", uploadId);
-    endpoint.searchParams.set("callback", callbackName);
-    script.src = endpoint.toString();
-    document.head.append(script);
-  });
-}
-
-async function waitForDriveUpload(uploadId) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    const response = await getUploadStatus(uploadId);
-    if (response?.ok && response.data?.status === "complete") return response.data;
-    if (response?.ok && response.data?.status === "failed") {
-      throw new Error(response.data.message || "Google Driveへの保存に失敗しました。");
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 900));
-  }
-  throw new Error("Google Driveへの保存が時間切れになりました。");
-}
 
 async function uploadPriceList() {
   if (state.priceListUploading) return;
-  const [file] = el.priceListFile.files;
+  const files = Array.from(el.priceListFiles.files);
   const endpoint = driveUploadSettings.endpoint.trim();
 
-  if (!file) {
-    setPriceListStatus("登録するPDFを選択してください。", true);
+  if (files.length === 0) {
+    setPriceListStatus("登録するPDFまたは画像を選択してください。", true);
     return;
   }
-  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-    setPriceListStatus("PDFファイルだけを登録できます。", true);
+  if (files.length + state.pendingPriceLists.length > priceListMaxFiles) {
+    setPriceListStatus(`料金表は${priceListMaxFiles}点まで登録できます。`, true);
     return;
   }
-  if (file.size > priceListMaxBytes) {
-    setPriceListStatus("PDFは15MB以下にしてください。", true);
+  const invalidFile = files.find((file) => !isSupportedPriceListFile(file));
+  if (invalidFile) {
+    setPriceListStatus("PDF、JPEG、PNG、GIF、WebP、HEIC画像だけを登録できます。", true);
+    return;
+  }
+  const oversizedFile = files.find((file) => file.size > priceListMaxBytes);
+  if (oversizedFile) {
+    setPriceListStatus("PDF・画像は1点15MB以下にしてください。", true);
     return;
   }
   if (!endpoint) {
@@ -255,26 +238,30 @@ async function uploadPriceList() {
 
   state.priceListUploading = true;
   el.uploadPriceList.disabled = true;
-  setPriceListStatus("Google Driveへ保存しています…");
+  setPriceListStatus(`Google Driveへ${files.length}点保存しています…`);
 
   try {
-    const uploadId = makeUploadId();
-    submitDriveUpload({
-      action: "uploadPriceList",
-      upload_id: uploadId,
-      upload_key: driveUploadSettings.uploadKey.trim(),
-      file_name: file.name,
-      mime_type: file.type || "application/pdf",
-      file_data: await readFileAsBase64(file),
-    });
-    const saved = await waitForDriveUpload(uploadId);
-    state.pendingPriceList = {
-      id: saved.fileId,
-      name: saved.fileName || file.name,
-      url: saved.url,
-      uploadedAt: saved.uploadedAt || new Date().toISOString(),
-    };
-    el.priceListFile.value = "";
+    const uploadingUser = requireApprovedUser().uid;
+    for (const file of files) {
+      const uploadId = makeUploadId();
+      const saved = await driveRequest({
+        action: "uploadPriceList",
+        upload_id: uploadId,
+        file_name: file.name,
+        mime_type: file.type || mimeTypeFromFileName(file.name),
+        file_data: await readFileAsBase64(file),
+      });
+      if (requireApprovedUser().uid !== uploadingUser) throw new Error("ログインが変わったため処理を中断しました。");
+      state.pendingPriceLists.push({
+        id: saved.fileId,
+        name: saved.fileName || file.name,
+        url: saved.url,
+        mimeType: saved.mimeType || file.type || mimeTypeFromFileName(file.name),
+        uploadedAt: saved.uploadedAt || new Date().toISOString(),
+      });
+      renderPriceListSelection();
+    }
+    el.priceListFiles.value = "";
     renderPriceListSelection();
     setPriceListStatus("Google Driveへ保存しました。報告を保存すると料金表リンクも登録されます。");
   } catch (error) {
@@ -285,23 +272,34 @@ async function uploadPriceList() {
   }
 }
 
-async function loadReports() {
-  if (hasFirebaseConfig()) {
-    try {
-      await connectFirestore();
-      return;
-    } catch (error) {
-      console.error("Firebase connection failed. Falling back to localStorage.", error);
-      el.syncStatus.textContent = "保存先: この端末（Firebase接続失敗）";
-    }
-  } else {
-    el.syncStatus.textContent = "保存先: この端末（Firebase未設定）";
-  }
+function isSupportedPriceListFile(file) {
+  const name = file.name.toLowerCase();
+  return file.type === "application/pdf" || file.type.startsWith("image/") || /\.(pdf|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(name);
+}
 
-  const saved = localStorage.getItem(storageKey);
-  state.reports = saved ? JSON.parse(saved) : createDemoReports();
-  persistReports();
-  renderCalendar();
+function mimeTypeFromFileName(name) {
+  const extension = name.toLowerCase().split(".").pop();
+  const types = {
+    pdf: "application/pdf",
+    avif: "image/avif",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+  return types[extension] || "application/octet-stream";
+}
+
+async function loadReports() {
+  localStorage.removeItem(storageKey);
+  try { await connectFirestore(); }
+  catch (error) {
+    console.error("Connection failed.", error);
+    document.querySelector("#accessMessage").textContent = "接続できませんでした。ネットワークを確認して再読み込みしてください。";
+  }
 }
 
 function persistReports() {
@@ -322,6 +320,19 @@ async function connectFirestore() {
   state.firestore = firestore;
   state.collectionRef = collectionRef;
   state.pushCollectionRef = pushCollectionRef;
+  let accessVersion = 0;
+  await initializeAccess(app, db, (approved, user) => {
+    const version = ++accessVersion;
+    state.unsubscribe?.();
+    state.unsubscribe = null;
+    state.authUser = user;
+    state.reports = [];
+    renderCalendar();
+    clearForm();
+    el.dialog.close();
+    document.querySelector("#attachmentView").hidden = true;
+    document.querySelector("#attachmentContent").replaceChildren();
+    if (!approved) return;
   el.syncStatus.textContent = "保存先: Firebase共有保存";
   setupPushControls().catch((error) => {
     console.error("Push setup failed.", error);
@@ -331,6 +342,7 @@ async function connectFirestore() {
   state.unsubscribe = firestore.onSnapshot(
     firestore.query(collectionRef, firestore.orderBy("date", "asc")),
     (snapshot) => {
+      if (version !== accessVersion) return;
       state.reports = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       renderCalendar();
     },
@@ -339,6 +351,41 @@ async function connectFirestore() {
       el.syncStatus.textContent = "保存先: Firebase共有保存（読み込みエラー）";
     },
   );
+    openLinkedAttachment(version, () => accessVersion).catch((error) => {
+      if (version !== accessVersion) return;
+      document.querySelector("#attachmentContent").textContent = error.message;
+    });
+  });
+}
+
+function priceListLink(item) {
+  if (!/^[a-zA-Z0-9_-]{10,}$/.test(item.id)) return item.url;
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set("attachment", item.id);
+  return url.href;
+}
+
+async function openLinkedAttachment(version, currentVersion) {
+  const id = new URLSearchParams(location.search).get("attachment");
+  if (!id) return;
+  const viewer = document.querySelector("#attachmentView");
+  const content = document.querySelector("#attachmentContent");
+  viewer.hidden = false;
+  content.textContent = "料金表を読み込んでいます…";
+  const file = await driveRequest({ action: "readPriceList", file_id: id });
+  if (version !== currentVersion()) return;
+  const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: file.mimeType }));
+  content.replaceChildren();
+  const link = document.createElement("a");
+  link.href = url; link.download = file.fileName; link.textContent = file.fileName + " をダウンロード";
+  content.append(link);
+  const preview = document.createElement(file.mimeType === "application/pdf" ? "iframe" : "img");
+  preview.src = url;
+  preview.title = file.fileName;
+  preview.className = "attachment-preview";
+  content.append(preview);
+  window.addEventListener("pagehide", () => URL.revokeObjectURL(url), { once: true });
 }
 
 function isPushSupported() {
@@ -434,6 +481,7 @@ async function savePushSubscription(subscription) {
     doc(state.pushCollectionRef, subscriptionId),
     {
       subscription: payload,
+      uid: requireApprovedUser().uid,
       endpoint: payload.endpoint,
       userAgent: navigator.userAgent,
       updatedAt: serverTimestamp(),
@@ -532,7 +580,7 @@ function searchableText(report) {
       report.contact,
       report.note,
       feeSummary(report.fees),
-      report.priceList?.name || "",
+      ...normalizePriceLists(report.priceLists, report.priceList).map((priceList) => priceList.name),
     ].join(" "),
   );
 }
@@ -643,9 +691,9 @@ function openDetail(id) {
   if (!report) return;
 
   el.dialogTitle.textContent = `${report.company} / ${report.member}`;
-  const priceList = normalizePriceList(report.priceList);
-  const priceListRow = priceList
-    ? `<div class="detail-row"><span>料金表</span><strong><a class="detail-link" href="${escapeHtml(priceList.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(priceList.name)}</a></strong></div>`
+  const priceLists = normalizePriceLists(report.priceLists, report.priceList);
+  const priceListRow = priceLists.length > 0
+    ? `<div class="detail-row"><span>料金表</span><div class="detail-attachments">${priceLists.map((priceList) => `<a class="detail-link" href="${escapeHtml(priceListLink(priceList))}" target="_blank" rel="noopener noreferrer">${escapeHtml(priceList.name)}</a>`).join("")}</div></div>`
     : `<div class="detail-row"><span>料金表</span><strong>未登録</strong></div>`;
   el.dialogBody.innerHTML = `
     <div class="detail-row"><span>日付</span><strong>${escapeHtml(report.date)}</strong></div>
@@ -696,8 +744,8 @@ function fillForm(report) {
   el.company.value = report.company;
   el.contact.value = report.contact;
   setFees(report.fees);
-  state.pendingPriceList = normalizePriceList(report.priceList);
-  el.priceListFile.value = "";
+  state.pendingPriceLists = normalizePriceLists(report.priceLists, report.priceList);
+  el.priceListFiles.value = "";
   renderPriceListSelection();
   setPriceListStatus("");
   el.note.value = report.note;
@@ -711,8 +759,8 @@ function clearForm() {
   el.date.value = toDateKey(new Date());
   el.editingId.value = "";
   setFees();
-  state.pendingPriceList = null;
-  el.priceListFile.value = "";
+  state.pendingPriceLists = [];
+  el.priceListFiles.value = "";
   renderPriceListSelection();
   setPriceListStatus("");
   el.formTitle.textContent = "報告入力";
@@ -737,6 +785,8 @@ async function deleteFirebaseReport(id) {
 
 async function saveReport(event) {
   event.preventDefault();
+  requireApprovedUser();
+  if (state.priceListUploading) { setPriceListStatus("料金表の保存が終わるまでお待ちください。", true); return; }
   const report = {
     id: el.editingId.value || crypto.randomUUID(),
     date: el.date.value,
@@ -744,12 +794,13 @@ async function saveReport(event) {
     company: el.company.value.trim(),
     contact: el.contact.value.trim(),
     fees: collectFees(),
-    priceList: normalizePriceList(state.pendingPriceList),
+    priceLists: normalizePriceLists(state.pendingPriceLists),
     note: el.note.value.trim(),
   };
 
   if (state.storeMode === "firebase") {
-    await saveFirebaseReport(report);
+    try { await saveFirebaseReport(report); }
+    catch (error) { setPriceListStatus("報告を保存できませんでした。接続とログインをご確認ください。", true); return; }
     state.cursor = new Date(`${report.date}T00:00:00`);
     clearForm();
     showView("home");
@@ -792,14 +843,15 @@ function showView(name) {
 
 function bindEvents() {
   el.openForm.addEventListener("click", () => {
+    if (state.priceListUploading) return;
     clearForm();
     showView("form");
   });
   el.enableNotifications?.addEventListener("click", enablePushNotifications);
   el.uploadPriceList.addEventListener("click", uploadPriceList);
-  el.backHome.addEventListener("click", () => showView("home"));
+  el.backHome.addEventListener("click", () => { if (!state.priceListUploading) showView("home"); });
   el.form.addEventListener("submit", saveReport);
-  el.clearForm.addEventListener("click", clearForm);
+  el.clearForm.addEventListener("click", () => { if (!state.priceListUploading) clearForm(); });
   el.prevMonth.addEventListener("click", () => moveMonth(-1));
   el.nextMonth.addEventListener("click", () => moveMonth(1));
   el.searchInput.addEventListener("input", () => {
@@ -813,13 +865,6 @@ function bindEvents() {
     el.searchInput.focus();
   });
   el.closeDialog.addEventListener("click", () => el.dialog.close());
-  el.resetDemo.addEventListener("click", () => {
-    state.reports = createDemoReports();
-    persistReports();
-    clearForm();
-    renderCalendar();
-    showView("home");
-  });
 
   el.filters.forEach((button) => {
     button.addEventListener("click", () => {

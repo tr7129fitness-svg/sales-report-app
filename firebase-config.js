@@ -12,9 +12,7 @@ export const webPushPublicKey =
 
 export const driveUploadSettings = {
   // Apps ScriptをWebアプリとして公開した後に、末尾が /exec のURLを貼り付けます。
-  endpoint: "",
-  // Apps ScriptのPRICE_LIST_UPLOAD_KEYと同じ文字列を貼り付けます。
-  uploadKey: "",
+  endpoint: "https://script.google.com/macros/s/AKfycbw72BdFZSbGwPX7R8RKw2NmTdTU9NdHBnnnvN9nXztM86v4C4ax54SqYHe8XnWwth96/exec",
 };
 
 export function hasFirebaseConfig() {

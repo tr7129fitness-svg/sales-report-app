@@ -2,12 +2,37 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function admin() {
+      return verified() && request.auth.token.email == 'tr7129.fitness@gmail.com';
+    }
+    function approved() {
+      return admin() || (verified()
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status == 'approved');
+    }
+    match /members/{uid} {
+      allow get: if admin() || (verified() && request.auth.uid == uid);
+      allow list: if admin();
+      allow create: if verified() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'name', 'status', 'requestedAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedAt == request.time;
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'revoked']
+        && request.resource.data.reviewedAt == request.time;
+    }
     match /reports/{reportId} {
-      allow read, create, update, delete: if true;
+      allow read, create, update, delete: if approved();
     }
 
     match /pushSubscriptions/{subscriptionId} {
-      allow create, update, delete: if true;
+      allow create, update: if approved() && request.resource.data.uid == request.auth.uid;
+      allow delete: if approved() && resource.data.uid == request.auth.uid;
       allow read: if false;
     }
   }

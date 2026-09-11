@@ -22,12 +22,14 @@ Firestoreのルールは `sales-report-app-publish/firestore.rules` にありま
 firebase deploy --only firestore:rules
 ```
 
-現在のルールはログインなしで読み書きできる公開ルールです。URLを知っている人なら編集できるため、社外にURLを広げない運用にしてください。
+現在のルールはGoogleログインと初回の管理者承認を必須にします。管理者は `tr7129.fitness@gmail.com` です。承認は `members/{uid}` に永続保存され、再ログイン時やアップロード時の再承認は不要です。承認済みユーザーは全報告を閲覧・登録・編集でき、利用停止後はアクセスできません。
 
-## 料金表PDF
+Firebase AuthenticationでGoogleログインを有効にし、承認済みドメインへ `tr7129fitness-svg.github.io` を追加してください。公開時はFirestoreルール、Apps Scriptの最新版、静的ファイルの順に反映します。
 
-料金表PDFのGoogle Drive保存には、`google-drive-uploader/README.md` の手順でApps Script Webアプリを作成します。
-発行された`/exec` URLとアップロードキーを `firebase-config.js` の `driveUploadSettings` へ設定してから、WebアプリをGitHub Pagesに公開してください。
+## 料金表PDF・画像
+
+料金表のPDF・画像のGoogle Drive保存には、`google-drive-uploader/README.md` の手順でApps Script Webアプリを作成します。
+発行された`/exec` URLを `firebase-config.js` の `driveUploadSettings` へ設定してから、WebアプリをGitHub Pagesに公開してください。認証にはFirebase IDトークンを使い、共有秘密キーは公開ファイルに含めません。
 
 ## プッシュ通知
 

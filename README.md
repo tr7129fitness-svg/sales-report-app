@@ -1,12 +1,14 @@
 # 営業結果レポート
 
-無料公開とランニングコストなしを前提にした、GitHub Pages + Firebase Firestore のWebアプリです。
+GitHub Pages + Firebase Firestore のWebアプリです。Firebaseは利用量に応じた料金が発生する場合があります。
 
 ## 使い方
 
 ホームでは社員別のカレンダー確認と検索ができ、`報告入力` ボタンから入力画面へ移動できます。
 
 Firebase Firestoreに共有保存されるため、同じ公開URLを見る社員同士で同じ報告データを確認できます。
+
+Googleアカウントで初回利用申請を行い、管理者が一度承認します。以降は同じアカウントでログインでき、全データの閲覧・登録・料金表アップロードに追加承認は不要です。管理者が利用停止にするまで承認は保持されます。
 
 ## 現在の入力項目
 
@@ -15,16 +17,16 @@ Firebase Firestoreに共有保存されるため、同じ公開URLを見る社�
 - 会社名
 - 担当者名
 - 料金内容：各項目ごとに `なし` または500円単位で選択
-- 料金表：PDFをGoogle Driveへ保存し、そのリンクを営業報告ごとに記録
+- 料金表：PDF・画像をGoogle Driveへ保存し、そのリンクを営業報告ごとに記録
 - 営業の所感
 
-## 料金表PDF
+## 料金表PDF・画像
 
-営業報告の入力画面にある「料金表」からPDFを選択してGoogle Driveへ保存できます。
+営業報告の入力画面にある「料金表」からPDFまたは画像を選択してGoogle Driveへ保存できます。1回に複数選択でき、1点15MBまで、1つの報告につき8点まで登録できます。
 保存先は `営業報告アプリ_料金表` フォルダで、保存完了後に報告を保存すると、詳細画面の料金表欄から開けます。
 
 初回のみ、`google-drive-uploader/README.md` に従ってApps ScriptのWebアプリを設定し、
-`firebase-config.js` の `driveUploadSettings` にデプロイURLとアップロードキーを設定します。
+`firebase-config.js` の `driveUploadSettings` にデプロイURLを設定します。認証はFirebase IDトークンで行います。
 
 ## 検索
 

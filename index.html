@@ -11,10 +11,22 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./app-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./app-icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260909-price-list1" />
+    <link rel="stylesheet" href="./styles.css?v=20260911-approved1" />
   </head>
   <body>
-    <main class="app-shell">
+    <section id="accessGate" class="access-gate">
+      <h1>営業結果レポート</h1>
+      <p id="accessMessage" role="status">ログインを確認しています…</p>
+      <p id="accessAccount"></p>
+      <button id="loginButton" class="primary-button" type="button" disabled>Googleでログイン・利用申請</button>
+      <button id="gateLogout" class="ghost-button" type="button" hidden>別のアカウントでログイン</button>
+    </section>
+    <main id="appContent" class="app-shell" hidden>
+      <section id="attachmentView" hidden>
+        <h2>料金表</h2>
+        <div id="attachmentContent"></div>
+        <a href="./">カレンダーに戻る</a>
+      </section>
       <section id="homeView" class="view active-view" aria-label="ホーム">
         <header class="topbar">
           <div>
@@ -23,12 +35,20 @@
             <p class="sync-status" id="syncStatus">保存先を確認中</p>
           </div>
           <div class="top-actions">
+            <div class="account-control">
+              <span id="authStatus" class="auth-status">Googleログインを確認中</span>
+              <button class="ghost-button" id="authButton" type="button">Googleでログイン</button>
+            </div>
             <button class="ghost-button" id="enableNotifications" type="button" hidden>通知を許可</button>
             <button class="primary-button" id="openForm" type="button">報告入力</button>
           </div>
           <p class="notification-status" id="notificationStatus" hidden></p>
         </header>
 
+        <section id="approvalPanel" class="approval-panel" hidden>
+          <h2>利用者管理</h2>
+          <div id="approvalList" aria-live="polite"></div>
+        </section>
         <section class="calendar-area" aria-label="営業結果カレンダー">
           <div class="calendar-toolbar">
             <div class="month-tools" aria-label="月の切り替え">
@@ -73,7 +93,6 @@
         <section class="form-page">
           <div class="panel-heading">
             <h2>報告内容</h2>
-            <button id="resetDemo" type="button" class="text-button">初期データ</button>
           </div>
           <form id="reportForm">
             <input type="hidden" id="editingId" />
@@ -109,14 +128,14 @@
             <section class="price-list-section" aria-labelledby="priceListHeading">
               <div class="price-list-head">
                 <div>
-                  <p class="eyebrow">PDF</p>
+                  <p class="eyebrow">PDF / IMAGE</p>
                   <h2 id="priceListHeading">料金表</h2>
                 </div>
-                <span>PDF・15MBまで</span>
+                <span>PDF・画像 / 1点15MBまで</span>
               </div>
               <p class="price-list-current" id="priceListCurrent">料金表は未登録です。</p>
               <div class="price-list-controls">
-                <input id="priceListFile" type="file" accept="application/pdf,.pdf" />
+                <input id="priceListFiles" type="file" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.gif,.webp,.heic" multiple />
                 <button class="ghost-button" id="uploadPriceList" type="button">Google Driveへ保存</button>
               </div>
               <p class="price-list-status" id="priceListStatus" aria-live="polite"></p>
@@ -143,6 +162,6 @@
       <div id="dialogBody" class="dialog-body"></div>
     </dialog>
 
-    <script type="module" src="./app.js?v=20260909-price-list1"></script>
+    <script type="module" src="./app.js?v=20260911-approved1"></script>
   </body>
 </html>
