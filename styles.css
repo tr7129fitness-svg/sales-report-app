@@ -654,6 +654,27 @@ dialog::backdrop {
   margin-top: 8px;
 }
 
+.detail-image-section {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.detail-image-section h3 { margin: 0; font-size: 16px; }
+.detail-image-section figure { margin: 0; min-width: 0; }
+.detail-image-section figcaption { margin-bottom: 8px; overflow-wrap: anywhere; }
+.detail-image-section p { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.detail-bottom-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 480px;
+  object-fit: contain;
+  background: var(--paper);
+}
+
 @media (max-width: 980px) {
   .calendar-toolbar {
     align-items: flex-start;

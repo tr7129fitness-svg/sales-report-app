@@ -663,9 +663,85 @@ function feeSummary(fees = {}) {
   return selected.map(({ item, amount }) => `${item}: ${formatYen(amount)}円`).join(" / ");
 }
 
+let detailPreviewGeneration = 0;
+const detailPreviewUrls = new Set();
+
+function clearDetailPreviews() {
+  detailPreviewGeneration++;
+  for (const url of detailPreviewUrls) URL.revokeObjectURL(url);
+  detailPreviewUrls.clear();
+  el.dialogBody.querySelector('.detail-image-section')?.remove();
+}
+
+function previewFileId(item) {
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(item.id)) return item.id;
+  try {
+    const url = new URL(item.url);
+    if (url.hostname !== 'drive.google.com') return null;
+    const id = url.pathname.match(/^\/file\/d\/([a-zA-Z0-9_-]+)(?:\/|$)/)?.[1] || url.searchParams.get('id');
+    return /^[a-zA-Z0-9_-]{10,}$/.test(id || '') ? id : null;
+  } catch (_) { return null; }
+}
+
+async function appendDetailImagePreviews(items) {
+  const images = items.filter(isImagePriceList);
+  if (!images.length) return;
+  const generation = detailPreviewGeneration;
+  const section = document.createElement('section');
+  section.className = 'detail-image-section';
+  const heading = document.createElement('h3');
+  heading.textContent = '添付画像';
+  section.append(heading);
+  el.dialogBody.append(section);
+  const current = () => generation === detailPreviewGeneration && el.dialog.open;
+  for (const item of images) {
+    if (!current()) return;
+    const figure = document.createElement('figure');
+    const caption = document.createElement('figcaption');
+    const link = document.createElement('a');
+    link.href = priceListLink(item);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = item.name;
+    caption.append(link);
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.textContent = '画像を読み込んでいます…';
+    figure.append(caption, status);
+    section.append(figure);
+    try {
+      const id = previewFileId(item);
+      if (!id) throw new Error('Missing Drive file ID');
+      const file = await driveRequest({ action: 'readPriceList', file_id: id });
+      if (!current()) return;
+      if (!file.mimeType?.startsWith('image/')) throw new Error('Not an image');
+      const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: file.mimeType }));
+      detailPreviewUrls.add(url);
+      const image = document.createElement('img');
+      image.className = 'detail-bottom-image';
+      image.alt = item.name;
+      image.decoding = 'async';
+      image.addEventListener('load', () => { if (current()) status.remove(); });
+      image.addEventListener('error', () => {
+        image.remove();
+        if (current()) status.textContent = 'プレビューできません。上のリンクからGoogle Driveで確認してください。';
+        URL.revokeObjectURL(url);
+        detailPreviewUrls.delete(url);
+      });
+      image.src = url;
+      figure.append(image);
+    } catch (_) {
+      if (current()) status.textContent = 'プレビューできません。上のリンクからGoogle Driveで確認してください。';
+    }
+  }
+}
+
 function openDetail(id) {
   const report = state.reports.find((item) => item.id === id);
   if (!report) return;
+
+  clearDetailPreviews();
 
   el.dialogTitle.textContent = `${report.company} / ${report.member}`;
   const priceLists = normalizePriceLists(report.priceLists, report.priceList);
@@ -696,6 +772,7 @@ function openDetail(id) {
     el.dialog.close();
   });
   el.dialog.showModal();
+  appendDetailImagePreviews(priceLists);
 }
 
 function collectFees() {
@@ -819,6 +896,7 @@ function showView(name) {
 }
 
 function bindEvents() {
+  el.dialog.addEventListener('close', () => { if (!el.dialog.open) clearDetailPreviews(); });
   el.openForm.addEventListener("click", () => {
     if (state.priceListUploading) return;
     clearForm();
